@@ -15,6 +15,9 @@ import os
 import matplotlib.pyplot as plt
 import time
 from torchvision.models import ResNet18_Weights
+from PIL import Image
+from scipy.special import softmax
+import numpy as np
 
 
 # Constants
@@ -184,7 +187,7 @@ class ModelTrainer:
             model.load_state_dict(torch.load(self.model_params))
 
         return model
-
+    
 
 def remove_ds(some_list):
     """ If the ds file from a mac exists, remove it from the os directory list
@@ -215,8 +218,8 @@ def main():
     num_ftrs = model_ft.fc.in_features
 
     # Pull directory
-    pull_dir = 'parsed_hymenoptera/'
-    model_params = 'best_model_params.pt'
+    pull_dir = 'parsed_squirrel/'
+    model_params = 'best_model_params_squirrel.pt'
 
     # Class length is the number of class folders in the training subdirectory
     train_sub = pull_dir + 'train'
@@ -247,11 +250,11 @@ def main():
             transforms.Resize(RESIZE_SHAPE),
             transforms.ToTensor(),
             transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
-        ]),
+        ])
     }
 
     # Define  hyperparameters
-    learning_rate = 1.5e-5
+    learning_rate = 3e-5
     weight_decay = 5e-5
     n_epochs = 14
     step_size = 3
