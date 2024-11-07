@@ -32,7 +32,6 @@ import os
 import math
 from PIL import Image
 import pandas as pd
-import numpy as np
 
 
 class FileParser():
@@ -40,8 +39,8 @@ class FileParser():
     def __init__(self, pull_path, push_path):
         self.pull_path = pull_path # Directory storing images prior to parsing
         self.push_path = push_path # Directory that will store parsed subdirectories for training, validation, and testing
-        self.path_type = [] # train, val, or test
-        self.true_class = [] # true class type, i.e. the name of the  directory containing the image
+        self.path_types = [] # train, val, or test
+        self.true_classes = [] # true class type, i.e. the name of the  directory containing the image
         self.image_paths = [] # image titles
         self.embeddings = [] # embeddings
         self.n_images = 0
@@ -108,6 +107,8 @@ class FileParser():
         # Subdirectory paths
         paths = ['train', 'val', 'test']
 
+        # Metadata File
+
         # Generate subdirectories for each class type
         for path in paths:
             # Make class directories
@@ -125,6 +126,9 @@ class FileParser():
                 self.n_images += 1
 
         print(f"Total number of Images: {self.n_images}")
+        # Append-adds at last
+        file0 = open("parser_data.txt", "w")  # write mode
+        file0.write(f"Total number of images: {self.n_images} \nSubdirectories: \n")
         print('-'*60)
         successful_filereads = self.n_images
         species_left = len(parent_dir)
@@ -140,25 +144,32 @@ class FileParser():
 
             child_dir_nfiles = len(child_dir)
 
+            file0.write(f"- {child} \n")
+            file0.write(f"    total image count: {child_dir_nfiles} \n")
+
             train_val_split_idx = int(math.floor(child_dir_nfiles * training_weight))
             val_test_split_idx = train_val_split_idx + int(math.floor(child_dir_nfiles * validation_weight))
             
             # Append to true class
             for image in child_dir:
-                self.true_class.append(child)
+                self.true_classes.append(child)
 
             # Split for training and validation
             train_images = child_dir[:train_val_split_idx]
             validation_images = child_dir[train_val_split_idx:val_test_split_idx]
             test_images = child_dir[val_test_split_idx:]
+
+            file0.write(f"    training image count: {len(train_images)} \n")
+            file0.write(f"    validation image count: {len(validation_images)} \n")
+            file0.write(f"    testing image count: {len(test_images)} \n \n")
             
             # Training
             for image in train_images:
                 
-                self.path_type.append('train')
+                self.path_types.append('train')
                 img_path = child_path + image
                 try:
-                    my_img = Image.open(child_path + image)
+                    my_img = Image.open(child_path + image).convert('RGB')
                     self.image_paths.append(img_path)
                 except TimeoutError:
                     # If image does not cooperate after a fair amount of time, skip
@@ -171,10 +182,10 @@ class FileParser():
 
             # Validation
             for image in validation_images:
-                self.path_type.append('val')
+                self.path_types.append('val')
                 img_path = child_path + image
                 try:
-                    my_img = Image.open(img_path)
+                    my_img = Image.open(img_path).convert('RGB')
                     self.image_paths.append(img_path)
                 except TimeoutError:
                     # If image does not cooperate after a fair amount of time, skip
@@ -186,10 +197,10 @@ class FileParser():
             
             # Testing
             for image in test_images:
-                self.path_type.append('test')
+                self.path_types.append('test')
                 img_path = child_path + image
                 try:
-                    my_img = Image.open(img_path)
+                    my_img = Image.open(img_path).convert('RGB')
                     self.image_paths.append(img_path)
                 except TimeoutError:
                     # If image does not cooperate after a fair amount of time, skip
@@ -213,32 +224,10 @@ class FileParser():
         total_time_elapsed = time.time() - global_time
         print("Total Elapsed Time: " + time.strftime("%H:%M:%S.{}".format(str(time_elapsed % 1)[2:])[:15],
                                             time.gmtime(total_time_elapsed)))
-        
-    
-    def write_csv(self, name, val=True):
-        """ Converts the FileParser object's path_type, true_class, and image_path instance variables lists into a pandas DataFrame and
-            exports it to a .csv ffile
-
-            Args:
-                - name: {
-                    type: str
-                    description: The string denoting the name of the .csv file being written to. This assumes that '.csv' is present in
-                                 name.
-                }
-
-                - val: {
-                    type: bool
-                    description: Boolean operator that togggles whether the parser generates a .csv file
-
-                }
-            
-            Returns: None
-        """
-        if val:
-            df = pd.DataFrame({'path_type':self.path_type, 'true_class':self.true_class, 'image_path':self.true_class})
-            df.to_csv(name, index=False)
-            print(f'"{name}" successfully written.')
-        
+        file0.write(f'Successful file reads: {successful_filereads} \n')
+        file0.write(f'Percent successful file reads: {round(float(successful_filereads) / self.n_images * 100,3)} %')
+        file0.close()
+                
     
     def mkdirs(self):
         """ Makes a directory to store the parsed image data. Also makes subsequent subdirectories for training, validation, and testing. 
@@ -259,21 +248,15 @@ class FileParser():
     
 def main():
     # Pull path is where images are coming from; push path is where theya re going after being parsed
-    pull_path = 'animals/'
-    push_path = 'TransformedBatch/'
+    pull_path = 'cat/'
+    push_path = 'parsed_' + pull_path
     
     # Instantiate object
     parser = FileParser(pull_path=pull_path, push_path=push_path)
 
     # Make push path directory and its subdirectories if needed. Parse images. 
     parser.mkdirs()
-    parser.parse()
-
-    # Write to .csv
-    csv_name = 'all_animals.csv'
-    parser.write_csv(csv_name)
-    print("Parsing complete.")
-    print('*'*60)
+    parser.parse(training_weight=0.7, validation_weight=0.2, test_weight=0.1)
 
 
 if __name__ == '__main__':
